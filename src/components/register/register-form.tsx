@@ -36,18 +36,21 @@ import {
 import * as z from "zod"
 import { PasswordInput } from "@/components/ui/password-input"
 import { formSchema } from "./schema"
+import { registerAction } from "./actions/registerAction"
 
 
-export default function RegisterForm({onSubmit}: {onSubmit:(values: z.infer<typeof formSchema>) => void}) {
+export default function RegisterForm() {
 
   const form = useForm < z.infer < typeof formSchema >> ({
     resolver: zodResolver(formSchema),
 
   })
 
-  function onSubmitHandler(values: z.infer < typeof formSchema > ) {
+  async function onSubmitHandler(values: z.infer < typeof formSchema > ) {
     try {
-      onSubmit(values)
+      await registerAction(values)
+      toast.success("Form submitted successfully")
+      form.reset()
     } catch (error) {
       console.error("Form submission error", error);
       toast.error("Failed to submit the form. Please try again.");
