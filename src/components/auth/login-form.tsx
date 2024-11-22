@@ -28,20 +28,38 @@ export function LoginForm() {
         setError(error.message)
         return
       }
-      const { data: profileData } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", user!.id)
-      .single();       
-      switch (profileData?.role){
+      if (!user){
+        setError("User not found")
+        return 
+      }
+
+      const { data: profile, error: profileError } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", user.id)
+        .single()
+
+      if (profileError) {
+        setError("Could not fetch user profile")
+        return
+      }
+
+      if (!profile) {
+        setError("Profile not found")
+        return
+      }
+
+      switch (profile.role) {
         case "beneficiary":
           router.push("/profile")
           break
-        case null:
-          return 
-          break 
+        case "admin":
+        case "staff":
+        case "store":
+          router.push(`/${profile.role}`)
+          break
         default:
-          router.push(`/${profileData?.role}`)
+          setError("Invalid user role")
       }
     } catch (err) {
       setError('An unexpected error occurred')

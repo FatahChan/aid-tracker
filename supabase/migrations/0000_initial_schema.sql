@@ -11,6 +11,7 @@ CREATE TABLE profiles (
     phone_number TEXT,
     email TEXT,
     role user_role NOT NULL,
+    profile_picture_url TEXT,
     status BOOLEAN DEFAULT true,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
@@ -74,12 +75,12 @@ CREATE TABLE transactions (
 );
 
 -- Create RLS policies
-ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
-ALTER TABLE branches ENABLE ROW LEVEL SECURITY;
-ALTER TABLE staff ENABLE ROW LEVEL SECURITY;
-ALTER TABLE stores ENABLE ROW LEVEL SECURITY;
-ALTER TABLE beneficiaries ENABLE ROW LEVEL SECURITY;
-ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE branches ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE staff ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE stores ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE beneficiaries ENABLE ROW LEVEL SECURITY;
+-- ALTER TABLE transactions ENABLE ROW LEVEL SECURITY;
 
 -- Function to handle beneficiary profile creation
 CREATE OR REPLACE FUNCTION handle_beneficiary_profile()
@@ -109,115 +110,8 @@ CREATE TRIGGER on_beneficiary_profile_created
   FOR EACH ROW
   EXECUTE FUNCTION handle_beneficiary_profile();
 
--- Profiles policies
-
-CREATE POLICY "Admins can view all profiles"
-ON profiles FOR SELECT
-TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM profiles admin_profile
-    WHERE admin_profile.id = auth.uid()
-    AND admin_profile.role = 'admin'
-  )
-);
-
-CREATE POLICY "Staff can view beneficiary profiles"
-ON profiles FOR SELECT
-TO authenticated
-USING (
-  (
-    -- Staff member accessing the profile
-    EXISTS (
-      SELECT 1 FROM profiles staff_profile
-      WHERE staff_profile.id = auth.uid()
-      AND staff_profile.role = 'staff'
-    )
-    AND
-    -- Target profile must be a beneficiary
-    role = 'beneficiary'
-  )
-);
-
-CREATE POLICY "Users can view own profile"
-ON profiles FOR SELECT
-TO authenticated
-USING (id = auth.uid());
 
 
-CREATE POLICY "admins can create profiles, staff can create beneficiary profile"
-ON profiles FOR INSERT
-TO authenticated
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM profiles
-    WHERE id = auth.uid() 
-    AND role = 'admin'
-  )
-  OR
-  -- Allow staff to create only beneficiary profiles
-  (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE id = auth.uid() 
-      AND role = 'staff'
-    )
-    AND role = 'beneficiary'
-  )
-);
-
-CREATE POLICY "Only admins can delete profiles"
-ON profiles FOR DELETE
-TO authenticated
-USING (
-  EXISTS (
-    SELECT 1 FROM profiles
-    WHERE id = auth.uid() 
-    AND role = 'admin'
-  )
-);
-
-CREATE POLICY "admins can update any profile, staff can update beneficiary profiles except role"
-ON profiles FOR UPDATE
-TO authenticated
-USING (
-  -- Check if user is admin or staff updating a beneficiary
-  EXISTS (
-    SELECT 1 FROM profiles
-    WHERE id = auth.uid() AND (
-      role = 'admin' 
-      OR (
-        role = 'staff' 
-        AND EXISTS (
-          SELECT 1 FROM profiles p2
-          WHERE p2.id = profiles.id 
-          AND p2.role = 'beneficiary'
-        )
-      )
-    )
-  )
-)
-WITH CHECK (
-  -- Admin can do anything
-  EXISTS (
-    SELECT 1 FROM profiles
-    WHERE id = auth.uid() AND role = 'admin'
-  )
-  OR
-  -- Staff can only update beneficiary profiles and can't change roles
-  (
-    EXISTS (
-      SELECT 1 FROM profiles
-      WHERE id = auth.uid() AND role = 'staff'
-    )
-    AND role = (SELECT role FROM profiles WHERE id = auth.uid())
-    AND EXISTS (
-      SELECT 1 FROM profiles p2
-      WHERE p2.id = profiles.id 
-      AND p2.role = 'beneficiary'
-    )
-  )
-);
 
 -- Create updated_at function and trigger
 CREATE OR REPLACE FUNCTION update_updated_at_column()
@@ -258,3 +152,32 @@ CREATE TRIGGER update_transactions_updated_at
     BEFORE UPDATE ON transactions
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
+
+
+
+-- Create a function to handle new user creation
+CREATE OR REPLACE FUNCTION auth.handle_new_user()
+RETURNS trigger AS $$
+BEGIN
+  INSERT INTO public.profiles (id, email, role, full_name, phone_number)
+  VALUES (
+    new.id,
+    new.email,
+    COALESCE((new.raw_user_meta_data->>'role')::public.user_role, 'beneficiary'::public.user_role),
+    new.raw_user_meta_data->>'full_name',
+    new.raw_user_meta_data->>'phone_number'
+  );
+  RETURN new;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Trigger the function every time a user is created
+CREATE OR REPLACE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE PROCEDURE auth.handle_new_user();
+
+ALTER TABLE profiles ADD COLUMN IF NOT EXISTS profile_picture_url TEXT;
+
+INSERT INTO storage.buckets (id, name)
+VALUES ('profiles', 'profiles')
+ON CONFLICT DO NOTHING;
