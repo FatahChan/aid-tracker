@@ -1,5 +1,5 @@
 "use server"
-import { createClient } from "@/lib/supabase/service_role";
+import { createClient } from "@/lib/supabase/server";
 import { z } from "zod";
 import { formSchema } from "../schema";
 
