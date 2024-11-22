@@ -145,7 +145,7 @@ TO authenticated
 USING (id = auth.uid());
 
 
-CREATE POLICY "Only admins can create profiles"
+CREATE POLICY "admins can create profiles, staff can create beneficiary profile"
 ON profiles FOR INSERT
 TO authenticated
 WITH CHECK (
@@ -174,6 +174,48 @@ USING (
     SELECT 1 FROM profiles
     WHERE id = auth.uid() 
     AND role = 'admin'
+  )
+);
+
+CREATE POLICY "admins can update any profile, staff can update beneficiary profiles except role"
+ON profiles FOR UPDATE
+TO authenticated
+USING (
+  -- Check if user is admin or staff updating a beneficiary
+  EXISTS (
+    SELECT 1 FROM profiles
+    WHERE id = auth.uid() AND (
+      role = 'admin' 
+      OR (
+        role = 'staff' 
+        AND EXISTS (
+          SELECT 1 FROM profiles p2
+          WHERE p2.id = profiles.id 
+          AND p2.role = 'beneficiary'
+        )
+      )
+    )
+  )
+)
+WITH CHECK (
+  -- Admin can do anything
+  EXISTS (
+    SELECT 1 FROM profiles
+    WHERE id = auth.uid() AND role = 'admin'
+  )
+  OR
+  -- Staff can only update beneficiary profiles and can't change roles
+  (
+    EXISTS (
+      SELECT 1 FROM profiles
+      WHERE id = auth.uid() AND role = 'staff'
+    )
+    AND role = (SELECT role FROM profiles WHERE id = auth.uid())
+    AND EXISTS (
+      SELECT 1 FROM profiles p2
+      WHERE p2.id = profiles.id 
+      AND p2.role = 'beneficiary'
+    )
   )
 );
 
