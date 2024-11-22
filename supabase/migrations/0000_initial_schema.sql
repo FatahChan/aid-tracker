@@ -122,14 +122,20 @@ USING (
   )
 );
 
-CREATE POLICY "Staff can view profiles in their branch"
+CREATE POLICY "Staff can view beneficiary profiles"
 ON profiles FOR SELECT
 TO authenticated
 USING (
-  EXISTS (
-    SELECT 1 FROM profiles staff_profile
-    WHERE staff_profile.id = auth.uid()
-    AND staff_profile.role = 'staff'
+  (
+    -- Staff member accessing the profile
+    EXISTS (
+      SELECT 1 FROM profiles staff_profile
+      WHERE staff_profile.id = auth.uid()
+      AND staff_profile.role = 'staff'
+    )
+    AND
+    -- Target profile must be a beneficiary
+    role = 'beneficiary'
   )
 );
 
