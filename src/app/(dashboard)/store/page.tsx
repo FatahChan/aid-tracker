@@ -2,12 +2,15 @@ import { StatsCard } from '@/components/dashboard/stats-card'
 import { createClient } from '@/lib/supabase/server'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 
 export default async function StoreDashboardPage() {
   const supabase = await createClient()
 
   // Get current user's store
   const { data: profile } = await supabase.auth.getUser()
+  if (!profile.user?.id) redirect("/login")
+    
   const { data: storeProfile } = await supabase
     .from('profiles')
     .select('id')

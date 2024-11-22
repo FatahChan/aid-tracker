@@ -19,7 +19,7 @@ export function LoginForm() {
     setError(null)
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { error, data: {user} } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
@@ -28,8 +28,21 @@ export function LoginForm() {
         setError(error.message)
         return
       }
-
-      router.refresh()
+      const { data: profileData } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", user!.id)
+      .single();       
+      switch (profileData?.role){
+        case "beneficiary":
+          router.push("/profile")
+          break
+        case null:
+          return 
+          break 
+        default:
+          router.push(`/${profileData?.role}`)
+      }
     } catch (err) {
       setError('An unexpected error occurred')
     } finally {

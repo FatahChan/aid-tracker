@@ -10,24 +10,19 @@ This project is built with Next.js and Supabase, providing a secure authenticati
 
 ## Getting Started
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd aid
-   ```
 
-2. **Install dependencies**
+1. **Install dependencies**
    ```bash
    pnpm install
    ```
 
-3. **Set up Supabase locally**
+2. **Set up Supabase locally**
    ```bash
    # Start Supabase services
    pnpm supabase start
    ```
 
-4. **Configure environment variables**
+3. **Configure environment variables**
    ```bash
    cp .env.example .env.local
    ```
@@ -63,7 +58,7 @@ After seeding the database, you can login with:
 │   │   │   └── layout.tsx   # Auth layout
 │   │   ├── (dashboard)/     # Dashboard routes
 │   │   │   ├── admin/       # Admin section
-│   │   │   ├── branch/      # Branch management
+│   │   │   ├── staff/      # Branch management
 │   │   │   ├── store/       # Store management
 │   │   │   └── layout.tsx   # Dashboard layout
 │   │   ├── fonts/          # Font configurations
